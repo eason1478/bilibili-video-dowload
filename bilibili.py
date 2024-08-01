@@ -2,7 +2,6 @@ import requests
 import json
 import os
 import platform
-import subprocess
 from lxml import etree
 
 

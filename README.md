@@ -5,6 +5,7 @@
 Requests
 Platform
 Lxml
+ffmpeg
 
 This program can download ordinary videos from Bilibili.
 The prerequisite is to install ffmpeg first and make sure it is in the system environment variables.
@@ -13,3 +14,4 @@ Reqires environment:
 Requests
 Platform
 Lxml
+ffmpeg

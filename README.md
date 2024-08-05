@@ -10,7 +10,7 @@ ffmpeg
 This program can download ordinary videos from Bilibili.
 The prerequisite is to install ffmpeg first and make sure it is in the system environment variables.
 ./bilibili_video must not contain a file named 2.mp4, otherwise the program will not run correctly.
-Reqires environment:
+Reqires environments:
 Requests
 Platform
 Lxml

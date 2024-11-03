@@ -1,97 +1,95 @@
 import requests
 import json
 import os
-import platform
 from lxml import etree
+import subprocess
 
-
+# 初始化会话和请求头
 session = requests.Session()
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+    'User-Agent': 'Mozilla/5.0 ...',
     'Accept-Language': 'Chinese',
-    'referer':'https://www.bilibili.com/',
-
+    'referer': 'https://www.bilibili.com/',
 }
-url = input('bilibili url:')
 
+url = input('bilibili url:')
 try:
     resp = session.get(url, headers=headers)
+except requests.exceptions.SSLError:
+    print('E:Connection error');input();exit()
 except requests.exceptions.ConnectionError:
-    print("E:Connection error")
-    input()
-    exit()
+    print('E:Connection error');input();exit()
 except requests.exceptions.MissingSchema:
-    print("E:Invaild url")
-    input()
-    exit()
+    print('E:Invalid url');input();exit()
+except requests.exceptions.InvalidURL:
+    print('E:Invalid url');input();exit()
+except requests.exceptions.InvalidSchema:
+    print('E:Invalid url');input();exit()
+except:
+    print('E:Unknown error')
+    
 resp.encoding = 'utf-8'
 tree = etree.HTML(resp.text)
-title = '1'
+
+# 获取视频和音频的 URL
 play_info = tree.xpath('/html/head/script[4]/text()')
-
+title = tree.xpath('//*[@id="viewbox_report"]/div[1]/div/h1/text()')[0]
+play_info_json = json.loads(play_info[0][20:])
 try:
-    play_info = play_info[0][20:]
+    video_url = play_info_json['data']['dash']['video'][0]['baseUrl']
+    audio_url = play_info_json['data']['dash']['audio'][0]['baseUrl']
 except IndexError:
-    print('E:Unknown error')
-    input()
-    exit()
-play_info_json = json.loads(play_info)
-video_url = play_info_json['data']['dash']['video'][0]['baseUrl']
-audio_url = play_info_json['data']['dash']['audio'][0]['baseUrl']
-path = os.path.dirname(os.path.abspath(__file__))+'/bilibili_video/'
+    print('E:Unknown error');input();exit()
 
+# 创建目录
+w = os.getcwd()
+video_dir = f'{w}\\bilibili_video'
+if not os.path.exists(video_dir):
+    os.mkdir(video_dir)
+
+# 下载视频和音频
 def download_file(url, file_name):
-    # 发送GET请求
-    response = requests.get(url,headers=headers,stream=True)
-    # 检查请求是否成功
+    response = requests.get(url, headers=headers, stream=True)
     if response.status_code == 200:
-        # 打开一个文件用于写入二进制数据
+        total_size = int(response.headers.get('content-length', 0))
         with open(file_name, 'wb') as f:
-            if file_name[-1] == "4":
-                print("Downloading video...")
+            if file_name[-1] == '4':
+                print(f"Downloading video...")
+            elif file_name[-1] == '3':
+                print(f"Downloading audio...")
             else:
-                print("Downloading audio...")
-            # 遍历响应内容的每一个二进制块，写入到文件中
-            for chunk in response.iter_content(1024):
-                f.write(chunk)   
+                print('E:Unknown error');input();exit()
+
+            for chunk in response.iter_content(4096):
+                f.write(chunk)
+
     else:
-        print(f"E:Download failed\nstatu code:{response.status_code}")
-        print(video_url+"\n"+audio_url)
+        print(f"E:Download failed\nstatus code:{response.status_code}")
         input()
         exit()
 
+download_file(video_url, os.path.join(video_dir, f'{title}(1).mp4'))
+download_file(audio_url, os.path.join(video_dir, f'{title}(1).mp3'))
+
+# 合并文件
+ffmpeg_path = f'{w}\\ffmpeg\\bin\\ffmpeg'
+output_file = os.path.join(video_dir, f'{title}.mp4')
+with open(output_file,'w') as f:
+    pass
+merge_command = fr'"{ffmpeg_path}" -i "{os.path.join(video_dir, f"{title}(1).mp4")}" -i "{os.path.join(video_dir, f"{title}(1).mp3")}" -c copy "{output_file}"'
 try:
-    download_file(video_url,path+'1.mp4')
-    download_file(audio_url,path+'1.mp3')
-except requests.exceptions.ConnectionError:
-    print("E:Connection error")
-video_content = requests.get(url=video_url,headers=headers).content
-audio_content = requests.get(url=audio_url,headers=headers).content
-
-if not os.path.exists('./bilibili_video'):
-    os.mkdir('./bilibili_video')
+    os.remove(os.path.join(video_dir, f'{title}.mp4'))
+    result = subprocess.run(merge_command, shell=True, check=True, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+except subprocess.CalledProcessError as e:
+    print(f"E:Unknown error\n{e.returncode}")
+    print(f"{e.stderr}")  # 打印错误输出
 
 
-with open ('./bilibili_video/'+title+'.mp4','wb') as fp1:
-    fp1.write(video_content)
-    fp1 = path+title+'.mp4'
-    
-with open ('./bilibili_video/'+title+'.mp3','wb') as fp2:
-    fp2.write(audio_content)
-    fp2 = path+title+'.mp3'
-
-os.system('ffmpeg -i '+path+'1.mp4'+' -i '+path+'1.mp3'+' -c copy '+path+'2.mp4')
+# 清理临时文件
 print("Removing temporary files...")
-system = platform.system()
-if system == "Windows":
-    os.system(f'del {path}/1.mp3')
-    os.system(f'del {path}/1.mp4')
-else:
-    os.system(f'rm {path}/1.mp3')
-    os.system(f'rm {path}/1.mp4')
+os.remove(os.path.join(video_dir, f'{title}(1).mp3'))
+os.remove(os.path.join(video_dir, f'{title}(1).mp4'))
 
 print('Task accomplished')
-print(f'Video is in:{path[:-1]}')
+print(f'Video is in: {os.getcwd()}\\bilibili_video')
 input()
-
-
